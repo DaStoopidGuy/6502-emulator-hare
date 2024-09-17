@@ -22,6 +22,7 @@
 // Path to my hare std library
 // /usr/local/src/hare/stdlib
 use fmt;
+use debug;
 
 // Note for noob sareb:
 // u16 is 16 bits - a Word
@@ -36,12 +37,6 @@ fn mem_init() void = {
     return;
 };
 
-fn mem_write_word(cycles: *int, value: u16, address: u8) void = {
-    mem[address] = (value & 0xFF): u8;
-    mem[address + 1] = (value >> 8): u8;
-    *cycles -= 2;
-};
-
 type CPU = struct {
     pc: u16,// Program Counter
     sp: u8, // Stack Pointer
@@ -50,80 +45,106 @@ type CPU = struct {
     ac: u8,
     x:  u8,
     y:  u8,
-    //
-    //  Status Register:
-    //  ================
-    //  bit 0:  Carry
-    //  bit 1:  Zero
-    //  bit 2:  Interrupt
-    //  bit 3:  Decimal
-    //  bit 4:  Break
-    //  bit 5:  0 - Unused
-    //  bit 6:  Overflow
-    //  bit 7:  Negative
-    //
-    // sr: u8,
-    // FIXME: bool = bad? i think..? lol
-    C: bool,
-    Z: bool,
-    I: bool,
-    D: bool,
-    B: bool,
-    U: bool,
-    O: bool,
-    N: bool,
+
+    //  Status Register Flags:
+    C: bool, // Carry
+    Z: bool, // Zero
+    I: bool, // Interrupt Disable
+    D: bool, // Decimal Mode
+    B: bool, // Break Command
+    O: bool, // Overflow
+    N: bool, // Negative
 };
-// type srFlag = enum {
-//     C = 0,  // Carry
-//     Z,  // Zero
-//     I,  // Interrupt
-//     D,  // Decimal
-//     B,  // Break
-//     U,  // 0 - Unused
-//     O,  // Overflow
-//     N,  // Negative
-// };
 
 let cpu = CPU {...};
 
 fn cpu_reset() void = {
-    cpu.pc = 0xfffc;
-    cpu.sp = 0x01;
+    cpu.pc = 0xFFFC;
+    cpu.sp = 0xFF;
     cpu.ac = 0;
-    cpu.x = 0;
-    cpu.y = 0;
+    cpu.x  = 0;
+    cpu.y  = 0;
 
     mem_init();
 };
 
-fn cpu_fetch_byte(cycles: *int) u8 = {
+fn fetch_byte() u8 = {
     assert(cpu.pc < MAX_MEM);
     let data: u8 = mem[cpu.pc];
     cpu.pc += 1;
-    *cycles -= 1;
     return data;
 };
 
-fn cpu_fetch_word(cycles: *int) u16 = {
+fn fetch_word() u16 = {
     // 6502 is little endian
     assert(cpu.pc < MAX_MEM);
     let data: u16 = mem[cpu.pc];
     cpu.pc += 1;
 
-    let mem_data: u16 = mem[cpu.pc];
-    data |= mem_data << 8;
+    // let mem_data: u16 = mem[cpu.pc];
+    // data |= mem_data << 8;
+    data |= (mem[cpu.pc]: u16 << 8);
     cpu.pc += 1;
 
-    *cycles -= 2;
     return data;
 };
 
-// opcodes and stuffs
+fn write_word(value: u16, address: u8) void = {
+    mem[address] = (value & 0xFF): u8;
+    mem[address + 1] = (value >> 8): u8;
+};
+
+// TODO: need to test the stack functions properly
+fn sp_to_address() u16 = {
+    return 0x0100 | cpu.sp: u16;
+};
+
+fn stack_push_byte(value: u8) void = {
+    // sp register points to the next free byte of stack space
+    // store value at current free location
+    let address: u16 = sp_to_address();
+    mem[address] = value;
+    // post decrement the stack pointer
+    fmt::printfln("Pushed byte to stack: {:x}", value)!;
+    cpu.sp -= 1;
+};
+
+fn stack_push_word(value: u16) void = {
+    stack_push_byte(value: u8);
+    stack_push_byte((value >> 8): u8);
+    fmt::printfln("Pushed word to stack: {:x}", value)!;
+    return;
+};
+
+fn stack_pop_byte() u8 = {
+    // increment the stack pointer
+    cpu.sp += 1;
+    // now stack pointer points at the last pushed byte
+    // pull data from stack
+    let data: u8 = mem[sp_to_address()];
+    // TODO: set byte to null?
+    fmt::printfln("Popped byte from stack: {:x}", data)!;
+    return data;
+};
+
+fn stack_pop_word() u16 = {
+    let data: u16 = 0;
+    data |= stack_pop_byte(): u16 << 8;
+    data |= stack_pop_byte(): u16;
+    fmt::printfln("Popped word from stack: {:x}", data)!;
+    return data;
+};
+
+// CPU Instructions
 type ins = enum u8 {
-    lda_im  = 0xA9,
-    lda_zp  = 0xA5,
-    lda_zpx = 0xB5,
-    jsr     = 0x20,
+    // Load/Store operations
+    // LDA - Load Accumulator
+    lda_im  = 0xA9, // Immediate Mode
+    lda_zp  = 0xA5, // Zero Page
+    lda_zpx = 0xB5, // Zero Page, X
+    // Jumps and Calls
+    jsr     = 0x20, // jump to subroutine
+    rts     = 0x60, // return from subroutine
 };
 
 fn cpu_lda_set_status() void = {
@@ -133,24 +154,26 @@ fn cpu_lda_set_status() void = {
 
 fn cpu_execute(cycles: int) void = {
     for (cycles > 0) {
-        let ins: u8 = cpu_fetch_byte(&cycles);
-        // switch (ins) {
-        // case _ => -----;
-        // };
+        let ins: u8 = fetch_byte();
+
         switch (ins) {
         case ins::lda_im =>
-            let value: u8 = cpu_fetch_byte(&cycles);
+            let value: u8 = fetch_byte();
             cpu.ac = value;
             cpu_lda_set_status();
+            cycles -= 2;
             fmt::printfln("ins::lda_im, {:x}", value)!;
 
         case ins::jsr =>
-            let subAddr: u16 = cpu_fetch_word(&cycles);
-            mem_write_word(&cycles, cpu.pc - 1, cpu.sp);
-            cpu.sp += 1;
-            cpu.pc = subAddr;
-            cycles -= 1;
-            fmt::printfln("ins::jsr, {:x}", subAddr)!;
+            // push address - 1 of return point onto stack
+            stack_push_word(cpu.pc - 1);
+            // write_word(cpu.pc - 1, cpu.sp);
+            // cpu.sp -= 2;
+            // set program counter to target memory address
+            let subroutineAddr: u16 = fetch_word();
+            cpu.pc = subroutineAddr;
+            cycles -= 6;
+            fmt::printfln("ins::jsr, {:x}", subroutineAddr)!;
         case =>
             fmt::errorfln("Instruction unimplemented! {:x}", ins)!;
         };
@@ -163,10 +186,10 @@ export fn main() void = {
 
     // start - inline program
     mem[0xFFFC] = ins::jsr;
-    mem[0xFFFD] = 0x42;
+    mem[0xFFFD] = 0x52;
     mem[0xFFFE] = 0x42;
-    mem[0x4242] = ins::lda_im;
-    mem[0x4243] = 0x84;
+    mem[0x4252] = ins::lda_im;
+    mem[0x4253] = 0x69;
     // end - inline program
 
     cpu_execute(8);

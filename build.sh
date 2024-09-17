@@ -6,7 +6,26 @@ run() {
 }
 
 build() {
-    hare run $link_flags main.ha
+    hare build $link_flags main.ha
 }
 
-run
+run-valgrind() {
+    valgrind ./main
+}
+
+if [ $# -gt 0 ]; then
+    if [ "$1" == "run" ];
+    then
+        run
+    fi
+    if [ "$1" == "build" ];
+    then
+        build
+    fi
+    if [ "$1" == "valgrind" ];
+    then
+        run-valgrind
+    fi
+else
+    run
+fi
