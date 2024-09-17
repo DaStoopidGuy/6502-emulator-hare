@@ -19,6 +19,9 @@
 // https://www.reddit.com/r/C_Programming/comments/ojha2c/a_minimal_and_beginner_friendly_6502_emulator/
 // -> https://github.com/f0lg0/6502
 //
+// very nice website for instruction set reference
+// https://www.masswerk.at/6502/6502_instruction_set.html
+//
 // Path to my hare std library
 // /usr/local/src/hare/stdlib
 use fmt;

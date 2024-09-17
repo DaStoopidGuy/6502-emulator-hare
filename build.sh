@@ -1,5 +1,6 @@
 #! /bin/bash
-link_flags="-L. -lraylib -lm"
+# link_flags="-L. -lraylib -lm"
+link_flags=""
 
 run() {
     hare run $link_flags main.ha
