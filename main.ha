@@ -89,10 +89,10 @@ fn fetch_word() u16 = {
     return data;
 };
 
-fn write_word(value: u16, address: u8) void = {
-    mem[address] = (value & 0xFF): u8;
-    mem[address + 1] = (value >> 8): u8;
-};
+// fn write_word(value: u16, address: u8) void = {
+//     mem[address] = (value & 0xFF): u8;
+//     mem[address + 1] = (value >> 8): u8;
+// };
 
 // TODO: need to test the stack functions properly
 fn sp_to_address() u16 = {
@@ -105,14 +105,14 @@ fn stack_push_byte(value: u8) void = {
     let address: u16 = sp_to_address();
     mem[address] = value;
     // post decrement the stack pointer
-    fmt::printfln("Pushed byte to stack: {:x}", value)!;
+    // fmt::printfln("Pushed byte to stack: ${:X}", value)!;
     cpu.sp -= 1;
 };
 
 fn stack_push_word(value: u16) void = {
-    stack_push_byte(value: u8);
-    stack_push_byte((value >> 8): u8);
-    fmt::printfln("Pushed word to stack: {:x}", value)!;
+    stack_push_byte((value >> 8): u8);  // Push high byte first
+    stack_push_byte(value: u8);         // Then push low byte
+    // fmt::printfln("Pushed word to stack: ${:X}", value)!;
     return;
 };
 
@@ -123,15 +123,15 @@ fn stack_pop_byte() u8 = {
     // pull data from stack
     let data: u8 = mem[sp_to_address()];
     // TODO: set byte to null?
-    fmt::printfln("Popped byte from stack: {:x}", data)!;
+    // fmt::printfln("Popped byte from stack: ${:X}", data)!;
     return data;
 };
 
 fn stack_pop_word() u16 = {
     let data: u16 = 0;
-    data |= stack_pop_byte(): u16 << 8;
-    data |= stack_pop_byte(): u16;
-    fmt::printfln("Popped word from stack: {:x}", data)!;
+    data |= stack_pop_byte(): u16;      // Pop low byte first
+    data |= stack_pop_byte(): u16 << 8; // Then pop high byte
+    // fmt::printfln("Popped word from stack: ${:X}", data)!;
     return data;
 };
 
@@ -153,6 +153,9 @@ fn cpu_lda_set_status() void = {
 };
 
 fn cpu_execute(cycles: int) void = {
+    // jump to execution address of cold reset
+    cpu.pc = fetch_word();
+
     for (cycles > 0) {
         let ins: u8 = fetch_byte();
 
@@ -162,36 +165,52 @@ fn cpu_execute(cycles: int) void = {
             cpu.ac = value;
             cpu_lda_set_status();
             cycles -= 2;
-            fmt::printfln("ins::lda_im, {:x}", value)!;
+            fmt::printfln("ins::lda_im, ${:X}", value)!;
 
         case ins::jsr =>
-            // push address - 1 of return point onto stack
-            stack_push_word(cpu.pc - 1);
-            // write_word(cpu.pc - 1, cpu.sp);
-            // cpu.sp -= 2;
-            // set program counter to target memory address
             let subroutineAddr: u16 = fetch_word();
+            // push (address - 1) of return point onto stack
+            stack_push_word(cpu.pc - 1);
+            // set program counter to target memory address
             cpu.pc = subroutineAddr;
             cycles -= 6;
-            fmt::printfln("ins::jsr, {:x}", subroutineAddr)!;
+            fmt::printfln("ins::jsr, ${:X}", subroutineAddr)!;
+
+        case ins::rts =>
+            // pull return address from the stack
+            let returnAddress: u16 = stack_pop_word();
+            // set program counter to return address + 1
+            cpu.pc = returnAddress + 1;
+            cycles -= 6;
+            fmt::printfln("ins::rts (popped from stack: ${:X})", returnAddress)!;
+
         case =>
-            fmt::errorfln("Instruction unimplemented! {:x}", ins)!;
+            fmt::errorfln("Instruction unimplemented! ${:X}", ins)!;
+            break;
         };
     };
 };
 
 export fn main() void = {
-    fmt::println("6502 Emulator (NES) has started lol")!;
+    fmt::println("6502 Emulator has started lol")!;
     cpu_reset();
 
     // start - inline program
-    mem[0xFFFC] = ins::jsr;
-    mem[0xFFFD] = 0x52;
-    mem[0xFFFE] = 0x42;
+    // Set reset vector to point to program start
+    mem[0xFFFC] = 0x43;
+    mem[0xFFFD] = 0xFE;
+
+    mem[0xFE43] = ins::jsr;
+    mem[0xFE44] = 0x52;
+    mem[0xFE45] = 0x42;
+    mem[0xFE46] = ins::lda_im;
+    mem[0xFE47] = 0x96;
+
     mem[0x4252] = ins::lda_im;
     mem[0x4253] = 0x69;
+    mem[0x4254] = ins::rts;
     // end - inline program
 
-    cpu_execute(8);
-    fmt::printfln("CPU Register AC: {:x}", cpu.ac)!;
+    cpu_execute(16);
+    fmt::printfln("CPU Register AC: ${:X}", cpu.ac)!;
 };
