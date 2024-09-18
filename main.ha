@@ -22,6 +22,8 @@
 // very nice website for instruction set reference
 // https://www.masswerk.at/6502/6502_instruction_set.html
 //
+// https://www.nesdev.org/6502_cpu.txt
+//
 // Path to my hare std library
 // /usr/local/src/hare/stdlib
 use fmt;
@@ -72,7 +74,7 @@ fn cpu_reset() void = {
 };
 
 fn fetch_byte() u8 = {
-    assert(cpu.pc < MAX_MEM);
+    assert(cpu.pc < MAX_MEM, "Program Counter must not overflow MAX MEM");
     let data: u8 = mem[cpu.pc];
     cpu.pc += 1;
     return data;
@@ -80,24 +82,26 @@ fn fetch_byte() u8 = {
 
 fn fetch_word() u16 = {
     // 6502 is little endian
-    assert(cpu.pc < MAX_MEM);
-    let data: u16 = mem[cpu.pc];
-    cpu.pc += 1;
+    assert(cpu.pc < MAX_MEM, "Program Counter must not overflow MAX MEM");
+    let data: u16 = fetch_byte();
 
-    // let mem_data: u16 = mem[cpu.pc];
-    // data |= mem_data << 8;
-    data |= (mem[cpu.pc]: u16 << 8);
-    cpu.pc += 1;
+    data |= fetch_byte(): u16 << 8;
 
     return data;
 };
 
-// fn write_word(value: u16, address: u8) void = {
-//     mem[address] = (value & 0xFF): u8;
-//     mem[address + 1] = (value >> 8): u8;
-// };
+fn read_byte(address: u16) u8 = {
+    assert(address < MAX_MEM, "Address must not overflow MAX MEM");
+    let data: u8 = mem[address];
+    return data;
+};
 
-// TODO: need to test the stack functions properly
+fn read_word(address: u16) u16 = {
+    let data: u16 = read_byte(address);
+    data |= read_byte(address + 1): u16 << 8;
+    return data;
+};
+
 fn sp_to_address() u16 = {
     return 0x0100 | cpu.sp: u16;
 };
@@ -142,9 +146,16 @@ fn stack_pop_word() u16 = {
 type ins = enum u8 {
     // Load/Store operations
     // LDA - Load Accumulator
-    lda_im  = 0xA9, // Immediate Mode
-    lda_zp  = 0xA5, // Zero Page
-    lda_zpx = 0xB5, // Zero Page, X
+    lda_im  =  0xA9, // Immediate Mode
+    lda_zp  =  0xA5, // Zero Page
+    lda_zpx =  0xB5, // Zero Page, X
+    lda_abs =  0xAD, // Absolute
+    lda_absx = 0xBD, // Absoulte, X
+    lda_absy = 0xB9, // Absolute, Y
+    lda_indx = 0xA1, // Indirect, X
+    lda_indy = 0xB1, // Indirect, Y
+    // LDX - Load X Register
+    ldx_im = 0xA2,
     // Jumps and Calls
     jsr     = 0x20, // jump to subroutine
     rts     = 0x60, // return from subroutine
@@ -155,7 +166,13 @@ fn cpu_lda_set_status() void = {
     cpu.N = (cpu.ac & 0b10000000) > 0;  // set if bit 7 of a is set
 };
 
-fn cpu_execute(cycles: int) void = {
+fn cpu_ldx_set_status() void = {
+    cpu.Z = (cpu.x == 0);
+    cpu.N = (cpu.x & 0b10000000) > 0;
+};
+
+fn cpu_execute(cycles: int) int = {
+    let cyclesRequested: int = cycles;
     // jump to execution address of cold reset
     cpu.pc = fetch_word();
 
@@ -169,6 +186,87 @@ fn cpu_execute(cycles: int) void = {
             cpu_lda_set_status();
             cycles -= 2;
             fmt::printfln("ins::lda_im, ${:X}", value)!;
+
+        case ins::ldx_im =>
+            let value: u8 = fetch_byte();
+            cpu.x = value;
+            cpu_ldx_set_status();
+            cycles -= 2;
+            fmt::printfln("ins::ldx_im, ${:X}", value)!;
+
+        case ins::lda_zp =>
+            let address: u8 = fetch_byte();
+            cpu.ac = mem[address: u16];
+            cpu_lda_set_status();
+            cycles -= 3;
+            fmt::printfln("ins::lda_zp, ${:X}", address)!;
+
+        case ins::lda_zpx =>
+            // take zero page address from instruction
+            let address: u8 = fetch_byte();
+            // add current value of X register to it
+            address += cpu.x;
+            // load accumulator from the zeropage address
+            cpu.ac = mem[address: u16];
+            cpu_lda_set_status();
+            cycles -= 4;
+            fmt::printfln("ins::lda_zpx, ${:X}", address)!;
+
+        case ins::lda_abs =>
+            let address: u16 = fetch_word();
+            cpu.ac = mem[address];
+            cpu_lda_set_status();
+            cycles -= 4;
+            fmt::printfln("ins::lda_abs, ${:X}", address)!;
+
+        case ins::lda_absx =>
+            let address: u16 = fetch_word();
+            address += cpu.x;
+
+            // check if addition wraps around, or "page crossed"
+            // if the low byte is less than index register X,
+            // then it means page was crossed, additional cycle
+            if (address & 0x00FF < cpu.x) cycles -= 1;
+
+            cpu.ac = mem[address];
+            cpu_lda_set_status();
+            cycles -= 4;
+            fmt::printfln("ins::lda_absx, ${:X}", address)!;
+
+        case ins::lda_absy =>
+            let address: u16 = fetch_word();
+            address += cpu.y;
+            if (address & 0x00FF < cpu.x) cycles -= 1;
+
+            cpu.ac = mem[address];
+            cpu_lda_set_status();
+            cycles -= 4;
+            fmt::printfln("ins::lda_absy, ${:X}", address)!;
+
+        case ins::lda_indx =>
+            let address: u8 = fetch_byte();
+            address += cpu.x;
+            // this points to the least significant byte of the
+            // target address
+            let targetAddress: u16 = read_word(address: u16 & 0x00FF);
+            cpu.ac = mem[targetAddress];
+            cpu_lda_set_status();
+            cycles -= 6;
+            fmt::printfln("ins::lda_indx, ${:X}", address)!;
+
+        case ins::lda_indy =>
+            let address: u8 = fetch_byte();
+            // above zeropage address contains the least
+            // significant byte of the target address
+            let targetAddress: u16 = read_word(address: u16);
+            targetAddress += cpu.y;
+            if (targetAddress & 0xFF < cpu.y) cycles -= 1;
+
+            cpu.ac = mem[targetAddress];
+            cpu_lda_set_status();
+            cycles -= 5;
+            fmt::printfln("ins::lda_indy, ${:X}", address)!;
+
 
         case ins::jsr =>
             let subroutineAddr: u16 = fetch_word();
@@ -189,9 +287,11 @@ fn cpu_execute(cycles: int) void = {
 
         case =>
             fmt::errorfln("Instruction unimplemented! ${:X}", ins)!;
-            break;
+            cycles -= 1;    // it takes one cycle to fetch the opcode(1 byte)
+            // break;
         };
     };
+    return cyclesRequested - cycles;
 };
 
 export fn main() void = {

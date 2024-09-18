@@ -3,15 +3,15 @@
 link_flags=""
 
 run() {
-    hare run $link_flags main.ha
+    hare run main.ha
 }
 
 build() {
-    hare build $link_flags main.ha
+    hare build -o ./emulator-bin main.ha
 }
 
-run-valgrind() {
-    valgrind ./main
+tests() {
+    hare test .
 }
 
 if [ $# -gt 0 ]; then
@@ -23,10 +23,10 @@ if [ $# -gt 0 ]; then
     then
         build
     fi
-    if [ "$1" == "valgrind" ];
+    if [ "$1" == "test" ];
     then
-        run-valgrind
+        tests
     fi
 else
-    run
+    tests
 fi
