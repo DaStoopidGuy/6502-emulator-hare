@@ -160,12 +160,18 @@ type ins = enum u8 {
     ldx_zpy  = 0xB6,
     ldx_abs  = 0xAE,
     ldx_absy = 0xBE,
+    // LDY - Load Y Register
+    ldy_im   = 0xA0,
+    ldy_zp   = 0xA4,
+    ldy_zpx  = 0xB4,
+    ldy_abs  = 0xAC,
+    ldy_absx = 0xBC,
     // Jumps and Calls
     jsr     = 0x20, // jump to subroutine
     rts     = 0x60, // return from subroutine
 };
 
-fn cpu_load_register_set_status(register: u8) void = {
+fn cpu_set_status_load_register(register: u8) void = {
     cpu.Z = (register == 0);
     cpu.N = (register & 0b10000000) > 0;
 };
@@ -185,14 +191,14 @@ fn cpu_execute(cycles: int) int = {
         case ins::lda_im =>
             let value: u8 = fetch_byte();
             cpu.ac = value;
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 2;
             fmt::printfln("ins::lda_im, ${:X}", value)!;
 
         case ins::lda_zp =>
             let address: u8 = fetch_byte();
             cpu.ac = mem[address: u16];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 3;
             fmt::printfln("ins::lda_zp, ${:X}", address)!;
 
@@ -203,14 +209,14 @@ fn cpu_execute(cycles: int) int = {
             address += cpu.x;
             // load accumulator from the zeropage address
             cpu.ac = mem[address: u16];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_zpx, ${:X}", address)!;
 
         case ins::lda_abs =>
             let address: u16 = fetch_word();
             cpu.ac = mem[address];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_abs, ${:X}", address)!;
 
@@ -224,7 +230,7 @@ fn cpu_execute(cycles: int) int = {
             if (address & 0x00FF < cpu.x) cycles -= 1;
 
             cpu.ac = mem[address];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_absx, ${:X}", address)!;
 
@@ -234,7 +240,7 @@ fn cpu_execute(cycles: int) int = {
             if (address & 0x00FF < cpu.x) cycles -= 1;
 
             cpu.ac = mem[address];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_absy, ${:X}", address)!;
 
@@ -245,7 +251,7 @@ fn cpu_execute(cycles: int) int = {
             // target address
             let targetAddress: u16 = read_word(address: u16 & 0x00FF);
             cpu.ac = mem[targetAddress];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 6;
             fmt::printfln("ins::lda_indx, ${:X}", address)!;
 
@@ -255,10 +261,10 @@ fn cpu_execute(cycles: int) int = {
             // significant byte of the target address
             let targetAddress: u16 = read_word(address: u16);
             targetAddress += cpu.y;
-            if (targetAddress & 0xFF < cpu.y) cycles -= 1;
+            if (targetAddress & 0x00FF < cpu.y) cycles -= 1;
 
             cpu.ac = mem[targetAddress];
-            cpu_load_register_set_status(cpu.ac);
+            cpu_set_status_load_register(cpu.ac);
             cycles -= 5;
             fmt::printfln("ins::lda_indy, ${:X}", address)!;
 
@@ -268,14 +274,14 @@ fn cpu_execute(cycles: int) int = {
         case ins::ldx_im =>
             let value: u8 = fetch_byte();
             cpu.x = value;
-            cpu_load_register_set_status(cpu.x);
+            cpu_set_status_load_register(cpu.x);
             cycles -= 2;
             fmt::printfln("ins::ldx_im, ${:X}", value)!;
 
         case ins::ldx_zp =>
             let address: u8 = fetch_byte();
             cpu.x = mem[address: u16];
-            cpu_load_register_set_status(cpu.x);
+            cpu_set_status_load_register(cpu.x);
             cycles -= 3;
             fmt::printfln("ins::ldx_zp, ${:X}", address)!;
 
@@ -283,26 +289,70 @@ fn cpu_execute(cycles: int) int = {
             let address: u8 = fetch_byte();
             address += cpu.y;
             cpu.x = mem[address: u16];
-            cpu_load_register_set_status(cpu.x);
+            cpu_set_status_load_register(cpu.x);
             cycles -= 4;
             fmt::printfln("ins::ldx_zpy, ${:X}", address)!;
 
         case ins::ldx_abs =>
             let address: u16 = fetch_word();
             cpu.x = mem[address];
-            cpu_load_register_set_status(cpu.x);
+            cpu_set_status_load_register(cpu.x);
             cycles -= 4;
             fmt::printfln("ins::ldx_abs, ${:X}", address)!;
 
         case ins::ldx_absy =>
             let address: u16 = fetch_word();
             address += cpu.y;
-            if (address & 0xFF < cpu.y) cycles -= 1;
+            if (address & 0x00FF < cpu.y) cycles -= 1;
             cpu.x = mem[address];
-            cpu_load_register_set_status(cpu.x);
+            cpu_set_status_load_register(cpu.x);
             cycles -= 4;
             fmt::println("ins::ldx_absy, ${:X}", address)!;
 
+            // ---------------------
+            // LDY - Load Y Register
+            // ---------------------
+        case ins::ldy_im =>
+            let value: u8 = fetch_byte();
+            cpu.y = value;
+            cpu_set_status_load_register(cpu.y);
+            cycles -= 2;
+            fmt::printfln("ins::ldy_im, ${:X}", value)!;
+
+        case ins::ldy_zp =>
+            let address: u8 = fetch_byte();
+            cpu.y = mem[address: u16];
+            cpu_set_status_load_register(cpu.y);
+            cycles -= 3;
+            fmt::printfln("ins::ldy_zp, ${:X}", address)!;
+
+        case ins::ldy_zpx =>
+            let address: u8 = fetch_byte();
+            address += cpu.x;
+            cpu.y = mem[address];
+            cpu_set_status_load_register(cpu.y);
+            cycles -= 4;
+            fmt::printfln("ins::ldy_zpx, ${:X}", address)!;
+
+        case ins::ldy_abs =>
+            let address: u16 = fetch_word();
+            cpu.y = mem[address];
+            cpu_set_status_load_register(cpu.y);
+            cycles -= 4;
+            fmt::printfln("ins::ldy_abs, ${:X}", address)!;
+
+        case ins::ldy_absx =>
+            let address: u16 = fetch_word();
+            address += cpu.x;
+            if (address & 0x00FF < cpu.x) cycles -= 1;
+            cpu.y = mem[address];
+            cpu_set_status_load_register(cpu.y);
+            cycles -= 4;
+            fmt::printfln("ins::ldy_absx, ${:X}", address)!;
+
+            // ---------------
+            // Jumps and Calls
+            // ---------------
         case ins::jsr =>
             let subroutineAddr: u16 = fetch_word();
             // push (address - 1) of return point onto stack
@@ -330,25 +380,26 @@ fn cpu_execute(cycles: int) int = {
 };
 
 export fn main() void = {
-    fmt::println("6502 Emulator has started lol")!;
-    cpu_reset();
+    assert(false, "Emulator entrypoint unimplemented!");
+    // fmt::println("6502 Emulator has started lol")!;
+    // cpu_reset();
 
-    // start - inline program
-    // Set reset vector to point to program start
-    mem[0xFFFC] = 0x43;
-    mem[0xFFFD] = 0xFE;
+    // // start - inline program
+    // // Set reset vector to point to program start
+    // mem[0xFFFC] = 0x43;
+    // mem[0xFFFD] = 0xFE;
 
-    mem[0xFE43] = ins::jsr;
-    mem[0xFE44] = 0x52;
-    mem[0xFE45] = 0x42;
-    mem[0xFE46] = ins::lda_im;
-    mem[0xFE47] = 0x96;
+    // mem[0xFE43] = ins::jsr;
+    // mem[0xFE44] = 0x52;
+    // mem[0xFE45] = 0x42;
+    // mem[0xFE46] = ins::lda_im;
+    // mem[0xFE47] = 0x96;
 
-    mem[0x4252] = ins::lda_im;
-    mem[0x4253] = 0x69;
-    mem[0x4254] = ins::rts;
-    // end - inline program
+    // mem[0x4252] = ins::lda_im;
+    // mem[0x4253] = 0x69;
+    // mem[0x4254] = ins::rts;
+    // // end - inline program
 
-    cpu_execute(16);
-    fmt::printfln("CPU Register AC: ${:X}", cpu.ac)!;
+    // cpu_execute(16);
+    // fmt::printfln("CPU Register AC: ${:X}", cpu.ac)!;
 };
