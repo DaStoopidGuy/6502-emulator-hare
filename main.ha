@@ -146,29 +146,28 @@ fn stack_pop_word() u16 = {
 type ins = enum u8 {
     // Load/Store operations
     // LDA - Load Accumulator
-    lda_im  =  0xA9, // Immediate Mode
-    lda_zp  =  0xA5, // Zero Page
-    lda_zpx =  0xB5, // Zero Page, X
-    lda_abs =  0xAD, // Absolute
+    lda_im   = 0xA9, // Immediate Mode
+    lda_zp   = 0xA5, // Zero Page
+    lda_zpx  = 0xB5, // Zero Page, X
+    lda_abs  = 0xAD, // Absolute
     lda_absx = 0xBD, // Absoulte, X
     lda_absy = 0xB9, // Absolute, Y
     lda_indx = 0xA1, // Indirect, X
     lda_indy = 0xB1, // Indirect, Y
     // LDX - Load X Register
-    ldx_im = 0xA2,
+    ldx_im   = 0xA2,
+    ldx_zp   = 0xA6,
+    ldx_zpy  = 0xB6,
+    ldx_abs  = 0xAE,
+    ldx_absy = 0xBE,
     // Jumps and Calls
     jsr     = 0x20, // jump to subroutine
     rts     = 0x60, // return from subroutine
 };
 
-fn cpu_lda_set_status() void = {
-    cpu.Z = (cpu.ac == 0);  // set if ac == 0
-    cpu.N = (cpu.ac & 0b10000000) > 0;  // set if bit 7 of a is set
-};
-
-fn cpu_ldx_set_status() void = {
-    cpu.Z = (cpu.x == 0);
-    cpu.N = (cpu.x & 0b10000000) > 0;
+fn cpu_load_register_set_status(register: u8) void = {
+    cpu.Z = (register == 0);
+    cpu.N = (register & 0b10000000) > 0;
 };
 
 fn cpu_execute(cycles: int) int = {
@@ -180,24 +179,20 @@ fn cpu_execute(cycles: int) int = {
         let ins: u8 = fetch_byte();
 
         switch (ins) {
+            // ----------------------
+            // LDA - Load Accumulator
+            // ----------------------
         case ins::lda_im =>
             let value: u8 = fetch_byte();
             cpu.ac = value;
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 2;
             fmt::printfln("ins::lda_im, ${:X}", value)!;
-
-        case ins::ldx_im =>
-            let value: u8 = fetch_byte();
-            cpu.x = value;
-            cpu_ldx_set_status();
-            cycles -= 2;
-            fmt::printfln("ins::ldx_im, ${:X}", value)!;
 
         case ins::lda_zp =>
             let address: u8 = fetch_byte();
             cpu.ac = mem[address: u16];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 3;
             fmt::printfln("ins::lda_zp, ${:X}", address)!;
 
@@ -208,14 +203,14 @@ fn cpu_execute(cycles: int) int = {
             address += cpu.x;
             // load accumulator from the zeropage address
             cpu.ac = mem[address: u16];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_zpx, ${:X}", address)!;
 
         case ins::lda_abs =>
             let address: u16 = fetch_word();
             cpu.ac = mem[address];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_abs, ${:X}", address)!;
 
@@ -229,7 +224,7 @@ fn cpu_execute(cycles: int) int = {
             if (address & 0x00FF < cpu.x) cycles -= 1;
 
             cpu.ac = mem[address];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_absx, ${:X}", address)!;
 
@@ -239,7 +234,7 @@ fn cpu_execute(cycles: int) int = {
             if (address & 0x00FF < cpu.x) cycles -= 1;
 
             cpu.ac = mem[address];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 4;
             fmt::printfln("ins::lda_absy, ${:X}", address)!;
 
@@ -250,7 +245,7 @@ fn cpu_execute(cycles: int) int = {
             // target address
             let targetAddress: u16 = read_word(address: u16 & 0x00FF);
             cpu.ac = mem[targetAddress];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 6;
             fmt::printfln("ins::lda_indx, ${:X}", address)!;
 
@@ -263,10 +258,50 @@ fn cpu_execute(cycles: int) int = {
             if (targetAddress & 0xFF < cpu.y) cycles -= 1;
 
             cpu.ac = mem[targetAddress];
-            cpu_lda_set_status();
+            cpu_load_register_set_status(cpu.ac);
             cycles -= 5;
             fmt::printfln("ins::lda_indy, ${:X}", address)!;
 
+            // ---------------------
+            // LDX - Load X Register
+            // ---------------------
+        case ins::ldx_im =>
+            let value: u8 = fetch_byte();
+            cpu.x = value;
+            cpu_load_register_set_status(cpu.x);
+            cycles -= 2;
+            fmt::printfln("ins::ldx_im, ${:X}", value)!;
+
+        case ins::ldx_zp =>
+            let address: u8 = fetch_byte();
+            cpu.x = mem[address: u16];
+            cpu_load_register_set_status(cpu.x);
+            cycles -= 3;
+            fmt::printfln("ins::ldx_zp, ${:X}", address)!;
+
+        case ins::ldx_zpy =>
+            let address: u8 = fetch_byte();
+            address += cpu.y;
+            cpu.x = mem[address: u16];
+            cpu_load_register_set_status(cpu.x);
+            cycles -= 4;
+            fmt::printfln("ins::ldx_zpy, ${:X}", address)!;
+
+        case ins::ldx_abs =>
+            let address: u16 = fetch_word();
+            cpu.x = mem[address];
+            cpu_load_register_set_status(cpu.x);
+            cycles -= 4;
+            fmt::printfln("ins::ldx_abs, ${:X}", address)!;
+
+        case ins::ldx_absy =>
+            let address: u16 = fetch_word();
+            address += cpu.y;
+            if (address & 0xFF < cpu.y) cycles -= 1;
+            cpu.x = mem[address];
+            cpu_load_register_set_status(cpu.x);
+            cycles -= 4;
+            fmt::println("ins::ldx_absy, ${:X}", address)!;
 
         case ins::jsr =>
             let subroutineAddr: u16 = fetch_word();

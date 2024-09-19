@@ -28,19 +28,6 @@ fn test_start() void = {
     assert(cpu.N == false);
 };
 
-@test fn ldx_im() void = {
-    test_start();
-
-    mem[0xFE43] = ins::ldx_im;
-    mem[0xFE44] = 0x69;
-
-    let cyclesUsed = cpu_execute(2);
-    assert(cyclesUsed == 2);
-    assert(cpu.x == 0x69);
-    assert(cpu.Z == false);
-    assert(cpu.N == false);
-};
-
 @test fn lda_zp() void = {
     test_start();
     mem[0xFE43] = ins::lda_zp;
@@ -190,6 +177,88 @@ fn test_start() void = {
     assert(cpu.N == false);
 };
 
+// LDX - Load X Register
+@test fn ldx_im() void = {
+    test_start();
+    mem[0xFE43] = ins::ldx_im;
+    mem[0xFE44] = 0x69;
+
+    let cyclesUsed = cpu_execute(2);
+    assert(cyclesUsed == 2);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+@test fn ldx_zp() void = {
+    test_start();
+    mem[0xfe43] = ins::ldx_zp;
+    mem[0xfe44] = 0x32;
+    mem[0x0032] = 0x69;
+
+    let cyclesUsed = cpu_execute(3);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+@test fn ldx_zpy() void = {
+    test_start();
+    cpu.y = 0x21;
+    mem[0xfe43] = ins::ldx_zpy;
+    mem[0xfe44] = 0x32;
+    mem[0x0053] = 0x69;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+@test fn ldx_abs() void = {
+    test_start();
+    mem[0xfe43] = ins::ldx_abs;
+    mem[0xfe44] = 0xEE;
+    mem[0xfe45] = 0xEA;
+    mem[0xEAEE] = 0x69;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+@test fn ldx_absy_page_crossed() void = {
+    test_start();
+    cpu.y = 0x01;
+    mem[0xfe43] = ins::ldx_absy;
+    mem[0xfe44] = 0xFF;
+    mem[0xfe45] = 0xEA;
+    mem[0xEB00] = 0x69;
+
+    let cyclesUsed = cpu_execute(5);
+    assert(cyclesUsed == 5);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+@test fn ldx_absy_page_not_crossed() void = {
+    test_start();
+    cpu.y = 0x33;
+    mem[0xfe43] = ins::ldx_absy;
+    mem[0xfe44] = 0x66;
+    mem[0xfe45] = 0xEA;
+    mem[0xEA99] = 0x69;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(cpu.x == 0x69);
+    assert(cpu.Z == false);
+    assert(cpu.N == false);
+};
+
+// Jumps and Calls
 @test fn jsr_and_rts() void = {
     test_start();
 
