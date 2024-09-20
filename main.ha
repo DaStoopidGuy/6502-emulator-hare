@@ -166,6 +166,14 @@ type ins = enum u8 {
     ldy_zpx  = 0xB4,
     ldy_abs  = 0xAC,
     ldy_absx = 0xBC,
+    // STA - Store Accumulator
+    sta_zp   = 0x85,
+    sta_zpx  = 0x95,
+    sta_abs  = 0x8D,
+    sta_absx = 0x9D,
+    sta_absy = 0x99,
+    sta_indx = 0x81,
+    sta_indy = 0x91,
     // Jumps and Calls
     jsr     = 0x20, // jump to subroutine
     rts     = 0x60, // return from subroutine
@@ -349,6 +357,59 @@ fn cpu_execute(cycles: int) int = {
             cpu_set_status_load_register(cpu.y);
             cycles -= 4;
             fmt::printfln("ins::ldy_absx, ${:X}", address)!;
+
+            // -----------------------
+            // STA - Store Accumulator
+            // -----------------------
+        case ins::sta_zp =>
+            let address: u8 = fetch_byte();
+            mem[address: u16] = cpu.ac;
+            cycles -= 3;
+            fmt::printfln("ins::sta_zp, ${:X}", address)!;
+
+        case ins::sta_zpx =>
+            let address: u8 = fetch_byte();
+            address += cpu.x;
+            mem[address: u16] = cpu.ac;
+            cycles -= 4;
+            fmt::printfln("ins::sta_zpx, ${:X}", address)!;
+
+        case ins::sta_abs =>
+            let address: u16 = fetch_word();
+            mem[address] = cpu.ac;
+            cycles -= 4;
+            fmt::printfln("ins::sta_abs, ${:X}", address)!;
+
+        case ins::sta_absx =>
+            let address: u16 = fetch_word();
+            address += cpu.x;
+            mem[address] = cpu.ac;
+            cycles -= 5;
+            fmt::printfln("ins::sta_absx, ${:X}", address)!;
+
+        case ins::sta_absy =>
+            let address: u16 = fetch_word();
+            address += cpu.y;
+            mem[address] = cpu.ac;
+            cycles -= 5;
+            fmt::printfln("ins::sta_absy, ${:X}", address)!;
+
+        case ins::sta_indx =>
+            let address: u8 = fetch_byte();
+            address += cpu.x;
+            let targetAddress = read_word(address: u16);
+            mem[targetAddress] = cpu.ac;
+            cycles -= 6;
+            fmt::printfln("ins::sta_indx, ${:X}", address)!;
+
+        case ins::sta_indy =>
+            let address: u8 = fetch_byte();
+            let targetAddress: u16 = read_word(address: u16);
+            targetAddress += cpu.y;
+            mem[targetAddress] = cpu.ac;
+            cycles -= 6;
+            fmt::printfln("ins::sta_indy, ${:X}", address)!;
+
 
             // ---------------
             // Jumps and Calls

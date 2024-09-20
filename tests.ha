@@ -349,6 +349,99 @@ fn test_start() void = {
     assert(cpu.N == false);
 };
 
+// -----------------------
+// STA - Store Accumulator
+// -----------------------
+@test fn sta_zp() void = {
+    test_start();
+    cpu.ac = 0x69;
+    mem[0xFE43] = ins::sta_zp;
+    mem[0xFE44] = 0x33;
+
+    let cyclesUsed = cpu_execute(3);
+    assert(cyclesUsed == 3);
+    assert(mem[0x0033] == cpu.ac);
+};
+
+@test fn sta_zpx() void = {
+    test_start();
+    cpu.ac = 0x69;
+    cpu.x = 0x03;
+    mem[0xFE43] = ins::sta_zpx;
+    mem[0xFE44] = 0x30;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0x0033] == cpu.ac);
+};
+
+@test fn sta_abs() void = {
+    test_start();
+    cpu.ac = 0x69;
+    mem[0xFE43] = ins::sta_abs;
+    mem[0xFE44] = 0x69;
+    mem[0xFE45] = 0x42;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0x4269] == cpu.ac);
+};
+
+@test fn sta_absx() void = {
+    test_start();
+    cpu.ac = 0x69;
+    cpu.x = 0x03;
+    mem[0xFE43] = ins::sta_absx;
+    mem[0xFE44] = 0x30;
+    mem[0xFE45] = 0xEA;
+
+    let cyclesUsed = cpu_execute(5);
+    assert(cyclesUsed == 5);
+    assert(mem[0xEA33] == cpu.ac);
+};
+
+@test fn sta_absy() void = {
+    test_start();
+    cpu.ac = 0x69;
+    cpu.y = 0x03;
+    mem[0xFE43] = ins::sta_absy;
+    mem[0xFE44] = 0x30;
+    mem[0xFE45] = 0xEA;
+
+    let cyclesUsed = cpu_execute(5);
+    assert(cyclesUsed == 5);
+    assert(mem[0xEA33] == cpu.ac);
+};
+
+@test fn sta_indx() void = {
+    test_start();
+    cpu.ac = 0x69;
+    cpu.x = 0x23;
+    mem[0xFE43] = ins::sta_indx;
+    mem[0xFE44] = 0x32;
+    mem[0x0055] = 0xEE;
+    mem[0x0056] = 0xEA;
+
+    let cyclesUsed = cpu_execute(6);
+    assert(cyclesUsed == 6);
+    assert(mem[0xEAEE] == cpu.ac);
+};
+
+@test fn sta_indy() void = {
+    test_start();
+    cpu.ac = 0x69;
+    cpu.y = 0x01;
+    mem[0xFE43] = ins::sta_indy;
+    mem[0xFE44] = 0x55;
+    mem[0x0055] = 0xFF;
+    mem[0x0056] = 0xEA;
+
+    let cyclesUsed = cpu_execute(6);
+    assert(cyclesUsed == 6);
+    assert(mem[0xEB00] == cpu.ac);
+};
+
+
 // ---------------
 // Jumps and Calls
 // ---------------
