@@ -24,6 +24,10 @@
 //
 // https://www.nesdev.org/6502_cpu.txt
 //
+// Local path to obelisk 6502 guide (press gx in vim to open in browser)
+// --------------------------------
+// file:///home/sarebjay/code/extern/www.nesdev.org/obelisk-6502-guide/instructions.html
+//
 // Path to my hare std library
 // /usr/local/src/hare/stdlib
 use fmt;
@@ -174,6 +178,14 @@ type ins = enum u8 {
     sta_absy = 0x99,
     sta_indx = 0x81,
     sta_indy = 0x91,
+    // Store X Register
+    stx_zp  = 0x86,
+    stx_zpy = 0x96,
+    stx_abs = 0x8E,
+    // Store Y Register
+    sty_zp  = 0x84,
+    sty_zpx = 0x94,
+    sty_abs = 0x8C,
     // Jumps and Calls
     jsr     = 0x20, // jump to subroutine
     rts     = 0x60, // return from subroutine
@@ -409,6 +421,28 @@ fn cpu_execute(cycles: int) int = {
             mem[targetAddress] = cpu.ac;
             cycles -= 6;
             fmt::printfln("ins::sta_indy, ${:X}", address)!;
+
+            // ----------------
+            // Store X Register
+            // ----------------
+        case ins::stx_zp =>
+            let address: u8 = fetch_byte();
+            mem[address: u16] = cpu.x;
+            cycles -= 3;
+            fmt::printfln("ins::stx_zp, ${:X}", address)!;
+
+        case ins::stx_zpy =>
+            let address: u8 = fetch_byte();
+            address += cpu.y;
+            mem[address: u16] = cpu.x;
+            cycles -= 4;
+            fmt::printfln("ins::stx_zpy, ${:X}", address)!;
+
+        case ins::stx_abs =>
+            let address: u16 = fetch_word();
+            mem[address] = cpu.x;
+            cycles -= 4;
+            fmt::printfln("ins::stx_abs, ${:X}", address)!;
 
 
             // ---------------

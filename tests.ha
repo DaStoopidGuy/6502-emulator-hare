@@ -441,6 +441,43 @@ fn test_start() void = {
     assert(mem[0xEB00] == cpu.ac);
 };
 
+// ----------------------
+// STX - Store X Register
+// ----------------------
+@test fn stx_zp() void = {
+    test_start();
+    cpu.x = 0x69;
+    mem[0xFE43] = ins::stx_zp;
+    mem[0xFE44] = 0x33;
+
+    let cyclesUsed = cpu_execute(3);
+    assert(cyclesUsed == 3);
+    assert(mem[0x0033] == cpu.x);
+};
+
+@test fn stx_zpy() void = {
+    test_start();
+    cpu.x = 0x69;
+    cpu.y = 0x22;
+    mem[0xFE43] = ins::stx_zpy;
+    mem[0xFE44] = 0x33;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0x0055] == cpu.x);
+};
+
+@test fn stx_abs() void = {
+    test_start();
+    cpu.x = 0x69;
+    mem[0xFE43] = ins::stx_abs;
+    mem[0xFE44] = 0xEE;
+    mem[0xFE45] = 0xEA;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0xEAEE] == cpu.x);
+};
 
 // ---------------
 // Jumps and Calls
