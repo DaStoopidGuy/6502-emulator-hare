@@ -444,6 +444,27 @@ fn cpu_execute(cycles: int) int = {
             cycles -= 4;
             fmt::printfln("ins::stx_abs, ${:X}", address)!;
 
+            // ----------------
+            // Store Y Register
+            // ----------------
+        case ins::sty_zp =>
+            let address: u8 = fetch_byte();
+            mem[address: u16] = cpu.y;
+            cycles -= 3;
+            fmt::printfln("ins::sty_zp, ${:X}", address)!;
+
+        case ins::sty_zpx =>
+            let address: u8 = fetch_byte();
+            address += cpu.x;
+            mem[address: u16] = cpu.y;
+            cycles -= 4;
+            fmt::printfln("ins::sty_zpx, ${:X}", address)!;
+
+        case ins::sty_abs =>
+            let address: u16 = fetch_word();
+            mem[address] = cpu.y;
+            cycles -= 4;
+            fmt::printfln("ins::sty_abs, ${:X}", address)!;
 
             // ---------------
             // Jumps and Calls

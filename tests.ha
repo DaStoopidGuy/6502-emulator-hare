@@ -479,6 +479,44 @@ fn test_start() void = {
     assert(mem[0xEAEE] == cpu.x);
 };
 
+// ----------------
+// Store Y Register
+// ----------------
+@test fn sty_zp() void = {
+    test_start();
+    cpu.y = 0x69;
+    mem[0xFE43] = ins::sty_zp;
+    mem[0xFE44] = 0x33;
+
+    let cyclesUsed = cpu_execute(3);
+    assert(cyclesUsed == 3);
+    assert(mem[0x0033] == 0x69);
+};
+
+@test fn sty_zpx() void = {
+    test_start();
+    cpu.y = 0x69;
+    cpu.x = 0x22;
+    mem[0xFE43] = ins::sty_zpx;
+    mem[0xFE44] = 0x33;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0x0055] == cpu.y);
+};
+
+@test fn sty_abs() void = {
+    test_start();
+    cpu.y = 0x69;
+    mem[0xFE43] = ins::sty_abs;
+    mem[0xFE44] = 0xEE;
+    mem[0xFE45] = 0xEA;
+
+    let cyclesUsed = cpu_execute(4);
+    assert(cyclesUsed == 4);
+    assert(mem[0xEAEE] == cpu.y);
+};
+
 // ---------------
 // Jumps and Calls
 // ---------------
